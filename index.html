@@ -15,7 +15,8 @@
   #map canvas:active{cursor:grabbing}
   .panel{position:fixed;background:rgba(255,255,255,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;box-shadow:0 4px 20px rgba(20,30,40,.15);padding:12px 14px}
   #hud{top:calc(12px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));width:236px}
-  #map-layers{top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));width:208px}
+  #map-layer-toggle{top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));padding:8px 12px;border:0;color:inherit;font:600 13px/1.4 system-ui,"Noto Sans TC",sans-serif;cursor:pointer}
+  #map-layers{top:calc(60px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));width:208px}
   #map-layers h2{margin:0 0 8px;font-size:14px}
   #map-layers label{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:13px;cursor:pointer}
   #map-layers select{width:100%;padding:5px 6px;border:1px solid #b7c1cc;border-radius:6px;background:#fff;color:inherit;font:inherit}
@@ -47,11 +48,12 @@
     .touch-only{display:block}
     #pad{display:grid}
     .desktop-only{display:none!important}
-    #hud{width:auto;padding:8px 10px;font-size:12px}
+    #hud{width:min(216px,calc(100vw - 100px));padding:8px 10px;font-size:12px}
     #hud h1{font-size:13px;margin:0 0 4px}
-    #status{grid-template-columns:auto auto auto auto;margin:0 0 6px}
+    #status{grid-template-columns:auto 1fr;gap:0 5px;margin:0 0 6px;font-size:11px;line-height:1.35}
     #reset{font-size:12px;padding:2px 8px}
-    #map-layers{top:calc(86px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));width:154px;padding:8px 10px}
+    #map-layer-toggle{top:calc(10px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));padding:7px 9px;font-size:12px}
+    #map-layers{top:calc(152px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));width:min(208px,calc(100vw - 16px));padding:8px 10px}
     #map-layers h2{margin-bottom:4px;font-size:12px}
     #map-layers label{font-size:12px}
     #map-layers small{font-size:10px}
@@ -83,12 +85,13 @@
   <button id="reset">回到起點</button>
 </section>
 
-<section id="map-layers" class="panel" aria-label="地圖圖層">
+<button id="map-layer-toggle" class="panel" type="button" aria-expanded="false" aria-controls="map-layers">🗺️ 圖層</button>
+<section id="map-layers" class="panel" aria-label="地圖圖層" hidden>
   <h2>地圖圖層</h2>
   <select id="base-map" aria-label="底圖">
     <option value="streets">街道地圖</option>
     <option value="emap">臺灣通用電子地圖</option>
-    <option value="photo">正射影像</option>
+    <option value="photo" selected>正射影像</option>
   </select>
   <label><input id="building-frames" type="checkbox" checked>分棟建物框</label>
   <small>測繪中心圖資範圍以臺灣為主；影像與建物框依供應區域顯示。</small>
@@ -117,6 +120,7 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import * as maplibregl from 'maplibre-gl';
+import {buildFootprints, findSafePosition, isBlocked, moveAroundBuildings} from './building-collision.mjs';
 
 const START = [121.4870872, 24.9968507]; // [lng, lat]
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
@@ -139,6 +143,10 @@ const VIEWS = {
 const DIST = {min: .9, max: 8, initial: 2.4};
 const DEG = Math.PI / 180;
 const MAX_ZOOM = 25; // MapLibre tile IDs stop at z25
+const CAT_RADIUS = .22;
+const COLLISION_RANGE = 220;
+const COLLISION_REFRESH_DISTANCE = 8;
+const COLLISION_SAFE_DISTANCE = 32;
 const isTouch = matchMedia('(hover:none) and (pointer:coarse)').matches;
 
 const $ = s => document.querySelector(s);
@@ -194,7 +202,7 @@ class Cat {
     else if (GROUND.has(this.state)) this.pendingLie = !this.pendingLie;
   }
   approach(tx, tz, dt, rate) { const a = 1 - Math.exp(-dt * rate); this.vx += (tx - this.vx) * a; this.vz += (tz - this.vz) * a; }
-  step(dt, scale) {
+  step(dt, scale, blocked) {
     this.elapsed += dt;
     if (this.state === 'LieIdle' && this.moving) this.transition('StandUp');
     if (GROUND.has(this.state)) {
@@ -218,12 +226,15 @@ class Cat {
       const turn = 10 * dt;
       this.heading = wrapAngle(this.heading + clamp(wrapAngle(this.targetHeading - this.heading), -turn, turn));
     }
-    this.x += this.vx * scale * dt;
-    this.z += this.vz * scale * dt;
+    const next = moveAroundBuildings(blocked, this.x, this.z, this.x + this.vx * scale * dt, this.z + this.vz * scale * dt, CAT_RADIUS);
+    if (next.x === this.x) this.vx = 0;
+    if (next.z === this.z) this.vz = 0;
+    this.x = next.x;
+    this.z = next.z;
   }
-  update(dt, scale) {
+  update(dt, scale, blocked) {
     let left = clamp(dt, 0, .1);
-    while (left > 1e-8) { const s = Math.min(left, 1 / 120); this.step(s, scale); left -= s; }
+    while (left > 1e-8) { const s = Math.min(left, 1 / 120); this.step(s, scale, blocked); left -= s; }
   }
 }
 
@@ -241,7 +252,7 @@ const camera = new THREE.Camera();
 let renderer;
 
 let cat, mixer, actions = {}, active = null, fades = [], headBone;
-let mapBase = 'streets', showBuildingFrames = true;
+let mapBase = 'photo', mapBaseChosen = false, showBuildingFrames = true;
 function play(name) {
   const next = actions[name]; if (!next) return;
   next.reset().setEffectiveTimeScale(name === 'Run' ? RUN_ANIM_RATE : 1).setEffectiveWeight(1).play();
@@ -263,6 +274,54 @@ const map = new maplibregl.Map({
   canvasContextAttributes: {antialias: true},
 });
 map.on('error', e => console.warn(e.error || e));
+
+let collisionFootprints = [], collisionCenter = null, collisionDirty = true, placingCat = false;
+map.on('sourcedata', e => { if (e.sourceId === 'openmaptiles') collisionDirty = true; });
+
+function refreshCollisionFootprints() {
+  if (!cat || !map.isSourceLoaded('openmaptiles')) return false;
+  const features = map.querySourceFeatures('openmaptiles', {sourceLayer: 'building'});
+  collisionFootprints = buildFootprints(features, fromLngLat, cat, COLLISION_RANGE);
+  collisionCenter = {x: cat.x, z: cat.z};
+  collisionDirty = false;
+  return true;
+}
+
+const buildingBlocks = (x, z) => placingCat || !collisionCenter || !map.isSourceLoaded('openmaptiles') ||
+  Math.hypot(x - collisionCenter.x, z - collisionCenter.z) > COLLISION_SAFE_DISTANCE ||
+  isBlocked(collisionFootprints, x, z, CAT_RADIUS);
+
+function waitForBuildingTiles() {
+  if (map.isSourceLoaded('openmaptiles')) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { map.off('sourcedata', check); reject(new Error('建物資料載入逾時')); }, 15000);
+    const check = e => {
+      if (e.sourceId !== 'openmaptiles' || !map.isSourceLoaded('openmaptiles')) return;
+      clearTimeout(timer); map.off('sourcedata', check); resolve();
+    };
+    map.on('sourcedata', check);
+  });
+}
+
+async function placeCatOutsideBuildings() {
+  placingCat = true;
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      map.jumpTo({center: toLngLat(cat.x, cat.z), zoom: 21, pitch: 60});
+      map.triggerRepaint();
+      await new Promise(resolve => map.once('render', resolve));
+      await waitForBuildingTiles();
+      refreshCollisionFootprints();
+      const safe = findSafePosition(collisionFootprints, cat.x, cat.z, CAT_RADIUS);
+      if (!safe) throw new Error('附近找不到可站立的建物外位置');
+      if (Math.hypot(safe.x - cat.x, safe.z - cat.z) < .01) return;
+      cat.x = safe.x; cat.z = safe.z;
+    }
+    throw new Error('無法確認建物外的出生位置');
+  } finally {
+    placingCat = false;
+  }
+}
 
 function addNlscRaster(id, code, maxzoom = 19) {
   map.addSource(id, {
@@ -286,8 +345,17 @@ function syncMapLayers() {
   ]) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
 }
 
-$('#base-map').addEventListener('change', e => { mapBase = e.target.value; syncMapLayers(); saveState(); });
-$('#building-frames').addEventListener('change', e => { showBuildingFrames = e.target.checked; syncMapLayers(); saveState(); });
+function setLayerPanelOpen(open) {
+  $('#map-layers').hidden = !open;
+  $('#map-layer-toggle').setAttribute('aria-expanded', String(open));
+}
+$('#map-layer-toggle').addEventListener('click', () => setLayerPanelOpen($('#map-layers').hidden));
+document.addEventListener('pointerdown', e => {
+  if (!$('#map-layers').hidden && !e.target.closest('#map-layers, #map-layer-toggle')) setLayerPanelOpen(false);
+});
+document.addEventListener('keydown', e => { if (e.code === 'Escape') setLayerPanelOpen(false); });
+$('#base-map').addEventListener('change', e => { mapBase = e.target.value; mapBaseChosen = true; syncMapLayers(); saveState(); setLayerPanelOpen(false); });
+$('#building-frames').addEventListener('change', e => { showBuildingFrames = e.target.checked; syncMapLayers(); saveState(); setLayerPanelOpen(false); });
 
 const catLayer = {
   id: 'cat', type: 'custom', renderingMode: '3d',
@@ -398,7 +466,8 @@ let last = 0, hudClock = 0;
 function frame(now) {
   const dt = last ? Math.min((now - last) / 1000, .1) : 0; last = now;
   applyInput();
-  cat.update(dt, scale);
+  if (collisionDirty || !collisionCenter || Math.hypot(cat.x - collisionCenter.x, cat.z - collisionCenter.z) > COLLISION_REFRESH_DISTANCE) refreshCollisionFootprints();
+  cat.update(dt, scale, buildingBlocks);
   mixer.update(dt);
   for (const f of fades) { f.left -= dt; if (f.left <= 0 && f.action !== active) f.action.stop(); }
   fades = fades.filter(f => f.left > 0);
@@ -428,7 +497,7 @@ function frame(now) {
 function saveState() {
   if (!cat) return;
   const {lng, lat} = toLngLat(cat.x, cat.z);
-  const data = {lng, lat, heading: cat.heading, running: cat.running, lying: cat.lying, view, yaw, pitch: pitchOf, thirdDist, mapBase, showBuildingFrames};
+  const data = {lng, lat, heading: cat.heading, running: cat.running, lying: cat.lying, view, yaw, pitch: pitchOf, thirdDist, mapBase, mapBaseChosen, showBuildingFrames};
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch {}
 }
 function restoreState() {
@@ -443,7 +512,9 @@ function restoreState() {
   for (const v of ['third', 'first']) if (isNum(s.pitch?.[v])) pitchOf[v] = clamp(s.pitch[v], VIEWS[v].minPitch, VIEWS[v].maxPitch);
   if (isNum(s.thirdDist)) thirdDist = clamp(s.thirdDist, DIST.min, DIST.max);
   if (s.view === 'first') view = 'first';
-  if (MAP_BASES.includes(s.mapBase)) mapBase = s.mapBase;
+  if (MAP_BASES.includes(s.mapBase) && (s.mapBaseChosen === true || s.mapBase !== 'streets')) {
+    mapBase = s.mapBase; mapBaseChosen = true;
+  }
   if (typeof s.showBuildingFrames === 'boolean') showBuildingFrames = s.showBuildingFrames;
   syncMapLayers();
 }
@@ -534,7 +605,7 @@ window.addEventListener('keydown', e => {
     case 'ControlLeft': case 'ControlRight': e.preventDefault(); cat.toggleLie(); break;
     case 'Tab': setView(view === 'third' ? 'first' : 'third'); break;
     case 'KeyR': if (!e.ctrlKey && !e.metaKey) toggleRun(); break; // keep Ctrl+R reload
-    case 'KeyM': mapBase = MAP_BASES[(MAP_BASES.indexOf(mapBase) + 1) % MAP_BASES.length]; syncMapLayers(); saveState(); break;
+    case 'KeyM': mapBase = MAP_BASES[(MAP_BASES.indexOf(mapBase) + 1) % MAP_BASES.length]; mapBaseChosen = true; syncMapLayers(); saveState(); break;
     case 'KeyB': showBuildingFrames = !showBuildingFrames; syncMapLayers(); saveState(); break;
   }
 });
@@ -542,11 +613,17 @@ window.addEventListener('keyup', e => held.delete(e.code));
 window.addEventListener('blur', () => { held.clear(); releaseStick(); });
 document.addEventListener('visibilitychange', () => { held.clear(); releaseStick(); last = 0; });
 
-$('#reset').addEventListener('click', e => {
+$('#reset').addEventListener('click', async e => {
+  const button = e.currentTarget;
+  button.disabled = true;
+  const previous = {x: cat.x, z: cat.z};
   cat.reset(); yaw = 0; eyeOffset = null; thirdDist = DIST.initial;
   pitchOf.third = VIEWS.third.pitch; pitchOf.first = VIEWS.first.pitch;
+  try { await placeCatOutsideBuildings(); }
+  catch (error) { Object.assign(cat, previous); fail(`無法修正出生位置：${error.message}`); }
   saveState();
-  e.currentTarget.blur();
+  button.disabled = false;
+  button.blur();
 });
 $('#start').addEventListener('click', () => {
   $('#overlay').hidden = true;
@@ -573,6 +650,7 @@ try {
   restoreState();
   setView(view);
   syncGait();
+  await placeCatOutsideBuildings();
   $('#overlay-msg').textContent = isTouch
     ? '左下搖桿移動，右下按鈕跳躍／跑步／趴下／切換視角，拖曳畫面轉動鏡頭、雙指縮放。'
     : '點「開始」後用滑鼠看方向，WASD 帶小貓散步。';
