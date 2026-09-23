@@ -15,6 +15,12 @@
   #map canvas:active{cursor:grabbing}
   .panel{position:fixed;background:rgba(255,255,255,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;box-shadow:0 4px 20px rgba(20,30,40,.15);padding:12px 14px}
   #hud{top:calc(12px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));width:236px}
+  #map-layers{top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));width:208px}
+  #map-layers h2{margin:0 0 8px;font-size:14px}
+  #map-layers label{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:13px;cursor:pointer}
+  #map-layers select{width:100%;padding:5px 6px;border:1px solid #b7c1cc;border-radius:6px;background:#fff;color:inherit;font:inherit}
+  #map-layers input{margin:0;accent-color:#2f6fde}
+  #map-layers small{display:block;margin-top:7px;color:#66717f;font-size:11px;line-height:1.35}
   #hud h1{margin:0 0 8px;font-size:16px;letter-spacing:.04em}
   #status{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0 0 10px;font-variant-numeric:tabular-nums}
   #status dt{color:#66717f}
@@ -45,6 +51,10 @@
     #hud h1{font-size:13px;margin:0 0 4px}
     #status{grid-template-columns:auto auto auto auto;margin:0 0 6px}
     #reset{font-size:12px;padding:2px 8px}
+    #map-layers{top:calc(86px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));width:154px;padding:8px 10px}
+    #map-layers h2{margin-bottom:4px;font-size:12px}
+    #map-layers label{font-size:12px}
+    #map-layers small{font-size:10px}
   }
   [hidden]{display:none!important}
 </style>
@@ -67,9 +77,21 @@
     <li><kbd>Space</kbd> 跳躍</li>
     <li><kbd>Ctrl</kbd> 趴下休息／起身</li>
     <li><kbd>Tab</kbd> 第一／第三人稱</li>
+    <li><kbd>M</kbd> 切換底圖 · <kbd>B</kbd> 建物框</li>
     <li>滑鼠：轉向與仰角 · 滾輪：鏡頭遠近</li>
   </ul>
   <button id="reset">回到起點</button>
+</section>
+
+<section id="map-layers" class="panel" aria-label="地圖圖層">
+  <h2>地圖圖層</h2>
+  <select id="base-map" aria-label="底圖">
+    <option value="streets">街道地圖</option>
+    <option value="emap">臺灣通用電子地圖</option>
+    <option value="photo">正射影像</option>
+  </select>
+  <label><input id="building-frames" type="checkbox" checked>分棟建物框</label>
+  <small>測繪中心圖資範圍以臺灣為主；影像與建物框依供應區域顯示。</small>
 </section>
 
 <div id="stick" class="panel touch-only" aria-label="移動搖桿"><div id="knob"></div></div>
@@ -98,6 +120,8 @@ import * as maplibregl from 'maplibre-gl';
 
 const START = [121.4870872, 24.9968507]; // [lng, lat]
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+const NLSC_WMTS = 'https://wmts.nlsc.gov.tw/wmts';
+const MAP_BASES = ['streets', 'emap', 'photo'];
 const SAVE_KEY = 'happycat.state.v1';
 const CLIPS = ['Idle','Walk','Run','JumpStart','JumpLoop','JumpLand','LieDown','LieIdle','StandUp'];
 const LOOPING = new Set(['Idle','Walk','Run','JumpLoop','LieIdle']);
@@ -217,6 +241,7 @@ const camera = new THREE.Camera();
 let renderer;
 
 let cat, mixer, actions = {}, active = null, fades = [], headBone;
+let mapBase = 'streets', showBuildingFrames = true;
 function play(name) {
   const next = actions[name]; if (!next) return;
   next.reset().setEffectiveTimeScale(name === 'Run' ? RUN_ANIM_RATE : 1).setEffectiveWeight(1).play();
@@ -238,6 +263,31 @@ const map = new maplibregl.Map({
   canvasContextAttributes: {antialias: true},
 });
 map.on('error', e => console.warn(e.error || e));
+
+function addNlscRaster(id, code, maxzoom = 19) {
+  map.addSource(id, {
+    type: 'raster',
+    tiles: [`${NLSC_WMTS}/${code}/default/GoogleMapsCompatible/{z}/{y}/{x}`],
+    tileSize: 256, maxzoom,
+    attribution: '<a href="https://maps.nlsc.gov.tw/" target="_blank" rel="noopener noreferrer">內政部國土測繪中心</a>',
+  });
+  map.addLayer({id, type: 'raster', source: id, layout: {visibility: 'none'}, paint: {'raster-fade-duration': 0}});
+}
+
+function syncMapLayers() {
+  $('#base-map').value = mapBase;
+  $('#building-frames').checked = showBuildingFrames;
+  if (!map.getLayer('nlsc-emap')) return;
+  for (const [id, visible] of [
+    ['nlsc-emap', mapBase === 'emap'],
+    ['nlsc-photo', mapBase === 'photo'],
+    ['nlsc-labels', mapBase === 'photo'],
+    ['nlsc-buildings', showBuildingFrames],
+  ]) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+}
+
+$('#base-map').addEventListener('change', e => { mapBase = e.target.value; syncMapLayers(); saveState(); });
+$('#building-frames').addEventListener('change', e => { showBuildingFrames = e.target.checked; syncMapLayers(); saveState(); });
 
 const catLayer = {
   id: 'cat', type: 'custom', renderingMode: '3d',
@@ -266,6 +316,11 @@ map.on('style.load', () => {
     if (field && JSON.stringify(field).includes('name')) map.setLayoutProperty(layer.id, 'text-field', ['coalesce', ['get', 'name:zh-Hant'], ['get', 'name']]);
   }
   map.setSky({'sky-color': '#7fb4ec', 'horizon-color': '#dcebf7', 'fog-color': '#e6eef4', 'sky-horizon-blend': .6, 'horizon-fog-blend': .7, 'fog-ground-blend': .8, 'atmosphere-blend': 0});
+  addNlscRaster('nlsc-emap', 'EMAP');
+  addNlscRaster('nlsc-photo', 'PHOTO2');
+  addNlscRaster('nlsc-labels', 'EMAP2');
+  addNlscRaster('nlsc-buildings', 'BUILDX');
+  syncMapLayers();
   if (!map.getLayer('cat')) map.addLayer(catLayer);
 });
 
@@ -373,7 +428,7 @@ function frame(now) {
 function saveState() {
   if (!cat) return;
   const {lng, lat} = toLngLat(cat.x, cat.z);
-  const data = {lng, lat, heading: cat.heading, running: cat.running, lying: cat.lying, view, yaw, pitch: pitchOf, thirdDist};
+  const data = {lng, lat, heading: cat.heading, running: cat.running, lying: cat.lying, view, yaw, pitch: pitchOf, thirdDist, mapBase, showBuildingFrames};
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch {}
 }
 function restoreState() {
@@ -388,6 +443,9 @@ function restoreState() {
   for (const v of ['third', 'first']) if (isNum(s.pitch?.[v])) pitchOf[v] = clamp(s.pitch[v], VIEWS[v].minPitch, VIEWS[v].maxPitch);
   if (isNum(s.thirdDist)) thirdDist = clamp(s.thirdDist, DIST.min, DIST.max);
   if (s.view === 'first') view = 'first';
+  if (MAP_BASES.includes(s.mapBase)) mapBase = s.mapBase;
+  if (typeof s.showBuildingFrames === 'boolean') showBuildingFrames = s.showBuildingFrames;
+  syncMapLayers();
 }
 setInterval(saveState, 1000);
 window.addEventListener('pagehide', saveState);
@@ -476,6 +534,8 @@ window.addEventListener('keydown', e => {
     case 'ControlLeft': case 'ControlRight': e.preventDefault(); cat.toggleLie(); break;
     case 'Tab': setView(view === 'third' ? 'first' : 'third'); break;
     case 'KeyR': if (!e.ctrlKey && !e.metaKey) toggleRun(); break; // keep Ctrl+R reload
+    case 'KeyM': mapBase = MAP_BASES[(MAP_BASES.indexOf(mapBase) + 1) % MAP_BASES.length]; syncMapLayers(); saveState(); break;
+    case 'KeyB': showBuildingFrames = !showBuildingFrames; syncMapLayers(); saveState(); break;
   }
 });
 window.addEventListener('keyup', e => held.delete(e.code));
