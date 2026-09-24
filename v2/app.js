@@ -1,263 +1,32 @@
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#172b38">
-<title>HappyCat · 第一人稱 XR</title>
-
-<script type="importmap">
-{"imports":{
-  "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
-  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
-}}
-</script>
-
-<style>
-*{box-sizing:border-box}
-html,body{
-  margin:0;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  background:#172b38;
-  color:#eff7fb;
-  font:14px/1.5 system-ui,"Microsoft JhengHei",sans-serif
-}
-button,select{
-  font:inherit;
-  color:inherit;
-  border:1px solid #ffffff40;
-  border-radius:10px;
-  padding:9px 12px;
-  background:#213d4e;
-  touch-action:manipulation
-}
-button{cursor:pointer}
-button:disabled{opacity:.45;cursor:default}
-button.active{background:#236c63}
-button:focus-visible,select:focus-visible,a:focus-visible{
-  outline:3px solid #ffd780;
-  outline-offset:3px
-}
-a{color:#bde7ff}
-h1{font-size:16px;margin:0 0 7px}
-p{margin:7px 0}
-#view{
-  position:fixed;
-  inset:0;
-  display:block;
-  width:100%;
-  height:100%;
-  touch-action:none
-}
-#ui{position:fixed;inset:0;pointer-events:none}
-#ui:xr-overlay{background:transparent}
-.panel{
-  pointer-events:auto;
-  background:#102535ed;
-  border:1px solid #ffffff26;
-  border-radius:14px;
-  padding:12px;
-  backdrop-filter:blur(8px)
-}
-#hud{
-  position:absolute;
-  top:calc(12px + env(safe-area-inset-top));
-  left:12px;
-  width:min(360px,calc(100vw - 24px));
-  max-height:47vh;
-  overflow:auto
-}
-.row{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
-.sub,#readout{font-size:12px;color:#bed2df}
-#readout{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-#message,#boot-error{color:#ffd780}
-details summary{cursor:pointer}
-#crosshair{
-  position:absolute;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-  font:24px monospace;
-  text-shadow:0 1px 4px #000
-}
-#count{
-  position:absolute;
-  left:50%;
-  top:38%;
-  transform:translate(-50%,-50%);
-  font-size:48px;
-  font-weight:bold;
-  text-shadow:0 2px 8px #000
-}
-#controls{
-  position:absolute;
-  bottom:calc(38px + env(safe-area-inset-bottom));
-  left:50%;
-  transform:translateX(-50%);
-  width:min(480px,calc(100vw - 24px))
-}
-#still{
-  flex:1;
-  min-height:48px;
-  background:#ffd780;
-  color:#192c35;
-  font-weight:bold;
-  border:0
-}
-#move{display:flex;gap:7px;margin-top:8px}
-#move button{
-  flex:1;
-  touch-action:none;
-  user-select:none;
-  -webkit-user-select:none
-}
-#credit{
-  position:absolute;
-  bottom:calc(5px + env(safe-area-inset-bottom));
-  right:12px;
-  pointer-events:auto;
-  font-size:11px;
-  background:#102535dd;
-  padding:2px 6px;
-  border-radius:5px
-}
-#welcome{
-  position:absolute;
-  inset:0;
-  display:grid;
-  place-items:center;
-  background:#07172388;
-  pointer-events:auto
-}
-#welcome .panel{
-  width:min(430px,calc(100vw - 32px));
-  padding:24px
-}
-#start{
-  width:100%;
-  background:#ffd780;
-  color:#192c35;
-  font-weight:bold
-}
-.xr .map-only,.xr #crosshair{display:none!important}
-.xr #hud{max-height:28vh}
-[hidden]{display:none!important}
-</style>
-</head>
-
-<body>
-<canvas id="view" aria-label="第一人稱地圖"></canvas>
-
-<div id="ui">
-  <section id="hud" class="panel">
-    <h1>
-      HappyCat · 第一人稱 XR
-      <small class="sub">v0.1</small>
-    </h1>
-
-    <div id="readout">場景準備中…</div>
-    <p id="message" role="status" aria-live="polite">載入程式與模型…</p>
-
-    <details class="map-only">
-      <summary>定位、手機方向、底圖</summary>
-
-      <div class="row">
-        <button id="gps" type="button">啟用定位</button>
-        <button id="sensor" type="button">啟用手機方向</button>
-      </div>
-
-      <div class="row">
-        <button id="north" type="button">面向北方校正</button>
-        <button id="reset" type="button">回到起點</button>
-      </div>
-
-      <div class="row">
-        <label>
-          測繪中心底圖
-          <select id="basemap">
-            <option value="PHOTO2">正射影像</option>
-            <option value="EMAP">臺灣通用電子地圖</option>
-          </select>
-        </label>
-      </div>
-
-      <p class="sub">
-        眼高 1.65 公尺；圖資是平面，不含立體建物、地形與碰撞。
-      </p>
-
-      <p class="sub">
-        拖曳看方向／仰角，WASD 或下方按鈕移動。
-        啟用 GPS 後改由定位移動；啟用手機方向後改由感測器轉頭。
-      </p>
-
-      <a href="./index.html">返回小貓散步</a>
-    </details>
-
-    <div class="row">
-      <button id="ar" type="button" disabled>XR AR 檢查中</button>
-      <button id="vr" type="button" disabled>XR VR 檢查中</button>
-      <button id="exit" type="button" hidden>退出 XR</button>
-    </div>
-
-    <p id="xr-status" class="sub">一般模式不需要 XR 裝置。</p>
-  </section>
-
-  <div id="crosshair" aria-hidden="true">+</div>
-  <div id="count" aria-hidden="true"></div>
-
-  <section id="controls" class="panel">
-    <div class="row" style="margin-top:0">
-      <button id="still" type="button" disabled>模型載入中…</button>
-      <button id="hide" type="button">收起貓</button>
-    </div>
-
-    <p class="sub">
-      按鈕模擬靜止；3 秒後在當下視線前方約 2 公尺出現。
-      貓不跟鏡頭；AR 尚無地面辨識，可能浮空。
-    </p>
-
-    <div id="move" class="map-only">
-      <button type="button" data-move="left" aria-label="向左移動">←</button>
-      <button type="button" data-move="forward">前進</button>
-      <button type="button" data-move="back">後退</button>
-      <button type="button" data-move="right" aria-label="向右移動">→</button>
-    </div>
-  </section>
-
-  <div id="credit" class="map-only">
-    圖資 ©
-    <a href="https://maps.nlsc.gov.tw/"
-       target="_blank"
-       rel="noopener noreferrer">內政部國土測繪中心</a>
-  </div>
-
-  <div id="welcome">
-    <section class="panel">
-      <h1>用自己的視角遇見貓</h1>
-
-      <p>
-        先看測繪中心地圖，再按「我已靜止」，
-        3 秒後讓貓出現在眼前。
-      </p>
-
-      <p class="sub">
-        定位、方向感測及 XR 都由按鈕另外啟用。
-        請在安全且靜止的環境測試。
-      </p>
-
-      <p id="boot-error" role="alert"></p>
-      <button id="start" type="button" disabled>建立場景中…</button>
-    </section>
-  </div>
-</div>
-
-<script type="module">
 const $ = id => document.getElementById(id);
-const message = text => {
-  $('message').textContent = text;
+const setText = (id, value) => {
+  const element = $(id);
+  if (element.textContent !== value) element.textContent = value;
 };
+const message = text => {
+  setText('message', text);
+};
+
+const compactUI = matchMedia('(max-width:640px), (max-height:520px)');
+function syncCompactUI() {
+  $('movement').open = !compactUI.matches;
+  $('hud-extra').classList.remove('open');
+  $('hud').classList.remove('expanded');
+  $('hud-toggle').setAttribute('aria-expanded', 'false');
+  $('hud-toggle').textContent = '顯示詳情';
+}
+if (compactUI.addEventListener) {
+  compactUI.addEventListener('change', syncCompactUI);
+} else {
+  compactUI.addListener(syncCompactUI);
+}
+syncCompactUI();
+$('hud-toggle').addEventListener('click', () => {
+  const open = $('hud-extra').classList.toggle('open');
+  $('hud').classList.toggle('expanded', open);
+  $('hud-toggle').setAttribute('aria-expanded', String(open));
+  $('hud-toggle').textContent = open ? '收起詳情' : '顯示詳情';
+});
 
 const bootTimer = setTimeout(() => {
   $('boot-error').textContent =
@@ -270,7 +39,7 @@ async function main() {
     await import('three/addons/loaders/GLTFLoader.js');
 
   // 模型只讀取本 repository 的相對路徑，不另行上傳素材。
-  const MODEL_URL = './cat_v01.glb';
+  const MODEL_URL = new URL('../assets/cat_v01.glb', import.meta.url).href;
 
   // 沿用原本專案起點。
   const START = {
@@ -291,6 +60,15 @@ async function main() {
   const finite = v => typeof v === 'number' && Number.isFinite(v);
   const wrap = v => ((v % 360) + 360) % 360;
   const bearing = d => wrap(Math.atan2(d.x, -d.z) / RAD);
+  const stableTenth = (value, previous, circular = false) => {
+    if (previous === null) return Math.round(value * 10) / 10;
+    const difference = circular
+      ? ((value - previous + 540) % 360) - 180
+      : value - previous;
+    return Math.abs(difference) >= .2
+      ? Math.round(value * 10) / 10
+      : previous;
+  };
 
   let started = false;
   let modelReady = false;
@@ -316,6 +94,9 @@ async function main() {
   let sensorTimer = null;
   let lastAbsolute = -Infinity;
   let sensorText = '拖曳控制';
+  let sensorFilterReady = false;
+  let displayedHeading = null;
+  let displayedElevation = null;
 
   let session = null;
   let xrMode = null;
@@ -336,6 +117,8 @@ async function main() {
 
   const rawSensor = new THREE.Quaternion();
   const sensorCorrection = new THREE.Quaternion();
+  const sensorTarget = new THREE.Quaternion();
+  const filteredSensor = new THREE.Quaternion();
   const sensorEuler = new THREE.Euler();
   const screenCorrection = new THREE.Quaternion();
 
@@ -614,13 +397,26 @@ async function main() {
   // ============================================================
   // 第一人稱，不依附貓或頭部骨架。
   // ============================================================
+  function smoothSensor(dt) {
+    if (!sensorOn || !sensorSeen) return;
+
+    sensorTarget
+      .copy(sensorCorrection.setFromAxisAngle(yAxis, sensorOffset))
+      .multiply(rawSensor);
+
+    if (!sensorFilterReady) {
+      filteredSensor.copy(sensorTarget);
+      sensorFilterReady = true;
+    } else if (filteredSensor.angleTo(sensorTarget) > .3 * RAD) {
+      filteredSensor.slerp(sensorTarget, 1 - Math.exp(-dt * 10));
+    }
+  }
+
   function applyCamera() {
     camera.position.copy(player);
 
-    if (sensorOn && sensorSeen) {
-      camera.quaternion
-        .copy(sensorCorrection.setFromAxisAngle(yAxis, sensorOffset))
-        .multiply(rawSensor);
+    if (sensorOn && sensorSeen && sensorFilterReady) {
+      camera.quaternion.copy(filteredSensor);
     } else {
       camera.quaternion.setFromEuler(
         new THREE.Euler(
@@ -1057,6 +853,7 @@ async function main() {
     sensorOn = false;
     sensorSeen = false;
     sensorSeeded = false;
+    sensorFilterReady = false;
 
     clearTimeout(sensorTimer);
 
@@ -1104,6 +901,7 @@ async function main() {
       sensorOn = true;
       sensorSeen = false;
       sensorSeeded = false;
+      sensorFilterReady = false;
       sensorOffset = 0;
       sensorCalibrated = false;
       lastAbsolute = -Infinity;
@@ -1146,6 +944,7 @@ async function main() {
       ) * RAD;
 
       sensorCalibrated = true;
+      sensorFilterReady = false;
 
       message('已把目前方向設為北方；請確認手機確實面向北方。');
     } else {
@@ -1547,6 +1346,7 @@ async function main() {
       }
 
     } else {
+      smoothSensor(dt);
       applyCamera();
       movePlayer(dt);
       applyCamera();
@@ -1591,10 +1391,15 @@ async function main() {
       ) / RAD;
 
       if (session) {
-        $('readout').textContent =
+        setText('readout',
           `XR ${xrMode === 'immersive-ar' ? 'AR' : 'VR'}` +
-          ` · ${xrTracked ? '追蹤中' : '等待追蹤'}`;
+          ` · ${xrTracked ? '追蹤中' : '等待追蹤'}`);
+        setText('sensor-readout', '');
+        setText('position-readout', '');
       } else {
+        displayedHeading = wrap(stableTenth(b, displayedHeading, true));
+        displayedElevation = stableTenth(e, displayedElevation);
+
         const accuracyText = finite(accuracy)
           ? ` ±${Math.round(accuracy)}m`
           : '';
@@ -1603,12 +1408,12 @@ async function main() {
           ? ` ｜ 圖磚失敗 ${failedTiles}，可切換底圖重試`
           : '';
 
-        $('readout').textContent =
+        setText('readout',
+          `方位 ${displayedHeading.toFixed(1)}° · 仰角 ${displayedElevation.toFixed(1)}°`);
+        setText('sensor-readout', sensorText + tileErrorText);
+        setText('position-readout',
           `${gpsText}${accuracyText}` +
-          ` · ${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}` +
-          ` ｜ ${sensorText}` +
-          ` · ${b.toFixed(0)}° / 仰角 ${e.toFixed(0)}°` +
-          tileErrorText;
+          ` · ${ll.lat.toFixed(6)}, ${ll.lng.toFixed(6)}`);
       }
     }
 
@@ -1652,10 +1457,6 @@ async function main() {
       };
     }
   };
-
-  checkXR().catch(e => {
-    message(`XR 檢查失敗：${e.message}`);
-  });
 
   // ============================================================
   // 相對路徑載入原本的貓；優先播放 Idle。
@@ -1712,7 +1513,7 @@ async function main() {
 
     message(
       `無法載入 ${MODEL_URL}：${e.message}。` +
-      '請確認 HTML 與 GLB 在同一目錄；地圖仍可操作。'
+      '請確認共用模型檔可讀取；地圖仍可操作。'
     );
   }
 }
@@ -1726,6 +1527,3 @@ main().catch(error => {
 
   message(`啟動失敗：${error.message}`);
 });
-</script>
-</body>
-</html>

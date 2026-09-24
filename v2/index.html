@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#172b38">
+<title>HappyCat · 第一人稱預覽</title>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
+</script>
+
+<link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+<canvas id="view" aria-label="第一人稱地圖"></canvas>
+
+<div id="ui">
+  <section id="hud" class="panel">
+    <div id="hud-header">
+      <h1>
+        HappyCat · 第一人稱
+        <small class="sub">v0.1</small>
+      </h1>
+      <button id="hud-toggle" class="mobile-only" type="button"
+              aria-expanded="false" aria-controls="hud-extra">顯示詳情</button>
+    </div>
+
+    <div id="readout">場景準備中…</div>
+    <div id="sensor-readout" class="sub"></div>
+    <p id="message" role="status" aria-live="polite">載入程式與模型…</p>
+
+    <div id="hud-extra">
+      <div id="position-readout" class="sub"></div>
+      <details class="map-only">
+      <summary>定位、手機方向、底圖</summary>
+
+      <div class="row">
+        <button id="gps" type="button">啟用定位</button>
+        <button id="sensor" type="button">啟用手機方向</button>
+      </div>
+
+      <div class="row">
+        <button id="north" type="button">面向北方校正</button>
+        <button id="reset" type="button">回到起點</button>
+      </div>
+
+      <div class="row">
+        <label>
+          測繪中心底圖
+          <select id="basemap">
+            <option value="PHOTO2">正射影像</option>
+            <option value="EMAP">臺灣通用電子地圖</option>
+          </select>
+        </label>
+      </div>
+
+      <p class="sub">
+        眼高 1.65 公尺；圖資是平面，不含立體建物、地形與碰撞。
+      </p>
+
+      <p class="sub">
+        拖曳看方向／仰角，WASD 或下方按鈕移動。
+        啟用 GPS 後改由定位移動；啟用手機方向後改由感測器轉頭。
+      </p>
+
+      <a href="../">返回版本選擇</a> · <a href="../v1/">前往小貓散步</a>
+      </details>
+
+      <div class="row" hidden>
+        <button id="ar" type="button" disabled>XR AR 檢查中</button>
+        <button id="vr" type="button" disabled>XR VR 檢查中</button>
+        <button id="exit" type="button" hidden>退出 XR</button>
+      </div>
+
+      <p id="xr-status" class="sub" hidden>一般模式不需要 XR 裝置。</p>
+    </div>
+  </section>
+
+  <div id="crosshair" aria-hidden="true">+</div>
+  <div id="count" aria-hidden="true"></div>
+
+  <section id="controls" class="panel">
+    <div class="row">
+      <button id="still" type="button" disabled>模型載入中…</button>
+      <button id="hide" type="button">收起貓</button>
+    </div>
+
+    <details id="movement" class="map-only">
+      <summary>移動與操作說明</summary>
+      <p class="sub">
+        按鈕模擬靜止；3 秒後在當下視線前方約 2 公尺出現。
+        貓不跟鏡頭。
+      </p>
+
+      <div id="move">
+        <button type="button" data-move="left" aria-label="向左移動">←</button>
+        <button type="button" data-move="forward">前進</button>
+        <button type="button" data-move="back">後退</button>
+        <button type="button" data-move="right" aria-label="向右移動">→</button>
+      </div>
+    </details>
+  </section>
+
+  <div id="credit" class="map-only">
+    圖資 ©
+    <a href="https://maps.nlsc.gov.tw/"
+       target="_blank"
+       rel="noopener noreferrer">內政部國土測繪中心</a>
+  </div>
+
+  <div id="welcome">
+    <section class="panel">
+      <h1>用自己的視角遇見貓</h1>
+
+      <p>
+        先看測繪中心地圖，再按「我已靜止」，
+        3 秒後讓貓出現在眼前。
+      </p>
+
+      <p class="sub">
+        定位與方向感測由按鈕另外啟用。
+        請在安全且靜止的環境測試。
+      </p>
+
+      <p id="boot-error" role="alert"></p>
+      <button id="start" type="button" disabled>建立場景中…</button>
+    </section>
+  </div>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
