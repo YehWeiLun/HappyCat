@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import * as maplibregl from 'maplibre-gl';
-import {buildFootprints, findSafePosition, isBlocked, moveAroundBuildings} from '../building-collision.mjs';
+import {buildFootprints, findSafePosition, isBlocked, moveAroundBuildings} from './building-collision.mjs';
+import {addFur} from '../shared/cat-fur.mjs';
 
 const START = [121.4870872, 24.9968507]; // [lng, lat]
-const MODEL_URL = new URL('../assets/cat_v01.glb', import.meta.url).href;
+const MODEL_URL = new URL('../shared/cat_v01.glb', import.meta.url).href;
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const NLSC_WMTS = 'https://wmts.nlsc.gov.tw/wmts';
 const MAP_BASES = ['streets', 'emap', 'photo'];
@@ -519,6 +520,7 @@ try {
   const missing = CLIPS.filter(n => !(durations[n] > 0));
   if (missing.length) throw new Error(`模型缺少動畫：${missing.join(', ')}`);
   gltf.scene.traverse(o => { if (o.isMesh) o.frustumCulled = false; });
+  addFur(gltf.scene, {layers: isTouch ? 8 : 12});
   headBone = gltf.scene.getObjectByName('head');
   actor.add(gltf.scene);
   mixer = new THREE.AnimationMixer(gltf.scene);

@@ -37,9 +37,10 @@ async function main() {
   const THREE = await import('three');
   const {GLTFLoader} =
     await import('three/addons/loaders/GLTFLoader.js');
+  const {addFur} = await import('../shared/cat-fur.mjs');
 
   // 模型只讀取本 repository 的相對路徑，不另行上傳素材。
-  const MODEL_URL = new URL('../assets/cat_v01.glb', import.meta.url).href;
+  const MODEL_URL = new URL('../shared/cat_v01.glb', import.meta.url).href;
 
   // 沿用原本專案起點。
   const START = {
@@ -1487,6 +1488,9 @@ async function main() {
 
     gltf.scene.traverse(o => {
       if (o.isMesh) o.frustumCulled = false;
+    });
+    addFur(gltf.scene, {
+      layers: matchMedia('(hover:none) and (pointer:coarse)').matches ? 8 : 12
     });
 
     mixer = new THREE.AnimationMixer(gltf.scene);

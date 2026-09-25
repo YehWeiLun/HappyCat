@@ -4,22 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#7fb4ec">
-<title>HappyCat · 小貓散步</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.11.1/dist/maplibre-gl.css">
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/","maplibre-gl":"https://cdn.jsdelivr.net/npm/maplibre-gl@6.11.1/dist/maplibre-gl.mjs"}}</script>
-<link rel="stylesheet" href="../assets/v1/style.css">
+<title>HappyCat V3 · 透天厝探索</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"}}</script>
+<link rel="stylesheet" href="../assets/v3/style.css">
 </head>
 <body>
-<div id="map"></div>
+<canvas id="scene"></canvas>
 <div id="crosshair" hidden></div>
 
 <section id="hud" class="panel">
-  <h1>🐈 小貓散步</h1>
+  <h1>🐈 V3 · 透天厝探索</h1>
   <dl id="status">
     <dt>動作</dt><dd id="st-state">—</dd>
     <dt>步伐</dt><dd id="st-gait">走路</dd>
     <dt>視角</dt><dd id="st-view">第三人稱</dd>
     <dt>速度</dt><dd id="st-speed">0.0 m/s</dd>
+    <dt>位置</dt><dd id="st-floor">庭院</dd>
+    <dt>貓咪</dt><dd id="st-cat">—</dd>
   </dl>
   <ul class="keys desktop-only">
     <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動（依鏡頭方向）</li>
@@ -27,22 +28,11 @@
     <li><kbd>Space</kbd> 跳躍</li>
     <li><kbd>Ctrl</kbd> 趴下休息／起身</li>
     <li><kbd>Tab</kbd> 第一／第三人稱</li>
-    <li><kbd>M</kbd> 切換底圖 · <kbd>B</kbd> 建物框</li>
+    <li><kbd>C</kbd> 切換貓咪（細臉版／短頸版）</li>
     <li>滑鼠：轉向與仰角 · 滾輪：鏡頭遠近</li>
   </ul>
-  <button id="reset">回到起點</button>
-</section>
-
-<button id="map-layer-toggle" class="panel" type="button" aria-expanded="false" aria-controls="map-layers">🗺️ 圖層</button>
-<section id="map-layers" class="panel" aria-label="地圖圖層" hidden>
-  <h2>地圖圖層</h2>
-  <select id="base-map" aria-label="底圖">
-    <option value="streets">街道地圖</option>
-    <option value="emap">臺灣通用電子地圖</option>
-    <option value="photo" selected>正射影像</option>
-  </select>
-  <label><input id="building-frames" type="checkbox" checked>分棟建物框</label>
-  <small>測繪中心圖資範圍以臺灣為主；影像與建物框依供應區域顯示。</small>
+  <div class="hud-buttons"><button id="reset">回到門前</button><button id="swap-cat">換貓咪</button></div>
+  <p class="house-help">從正門進入，沿中央樓梯上下樓。室內可用 Tab／視角按鈕切換第一人稱。</p>
   <a class="home-link" href="../">返回版本選擇</a>
 </section>
 
@@ -59,12 +49,12 @@
 
 <div id="overlay">
   <div class="card panel">
-    <h2>小貓散步</h2>
-    <p id="overlay-msg">載入模型與地圖中…</p>
+    <h2>V3 · 透天厝探索</h2>
+    <p id="overlay-msg">載入模型中…</p>
     <button id="start" disabled>開始</button>
   </div>
 </div>
 
-<script type="module" src="../assets/v1/app.js"></script>
+<script type="module" src="../assets/v3/app.js"></script>
 </body>
 </html>
