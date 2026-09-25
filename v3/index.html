@@ -13,27 +13,32 @@
 <div id="crosshair" hidden></div>
 
 <section id="hud" class="panel">
-  <h1>🐈 V3 · 透天厝探索</h1>
-  <dl id="status">
-    <dt>動作</dt><dd id="st-state">—</dd>
-    <dt>步伐</dt><dd id="st-gait">走路</dd>
-    <dt>視角</dt><dd id="st-view">第三人稱</dd>
-    <dt>速度</dt><dd id="st-speed">0.0 m/s</dd>
-    <dt>位置</dt><dd id="st-floor">庭院</dd>
-    <dt>貓咪</dt><dd id="st-cat">—</dd>
-  </dl>
-  <ul class="keys desktop-only">
-    <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動（依鏡頭方向）</li>
-    <li><kbd>R</kbd> 切換走路／跑步</li>
-    <li><kbd>Space</kbd> 跳躍</li>
-    <li><kbd>Ctrl</kbd> 趴下休息／起身</li>
-    <li><kbd>Tab</kbd> 第一／第三人稱</li>
-    <li><kbd>C</kbd> 切換貓咪（細臉版／短頸版）</li>
-    <li>滑鼠：轉向與仰角 · 滾輪：鏡頭遠近</li>
-  </ul>
-  <div class="hud-buttons"><button id="reset">回到門前</button><button id="swap-cat">換貓咪</button></div>
-  <p class="house-help">從正門進入，沿中央樓梯上下樓。室內可用 Tab／視角按鈕切換第一人稱。</p>
-  <a class="home-link" href="../">返回版本選擇</a>
+  <div class="hud-head">
+    <h1>🐈 V3 · 透天厝探索</h1>
+    <button id="hud-toggle" aria-label="收合面板" aria-expanded="true">▾</button>
+  </div>
+  <div id="hud-body">
+    <dl id="status">
+      <dt>動作</dt><dd id="st-state">—</dd>
+      <dt>步伐</dt><dd id="st-gait">走路</dd>
+      <dt>視角</dt><dd id="st-view">第三人稱</dd>
+      <dt>速度</dt><dd id="st-speed">0.0 m/s</dd>
+      <dt>位置</dt><dd id="st-floor">庭院</dd>
+      <dt>貓咪</dt><dd id="st-cat">—</dd>
+    </dl>
+    <ul class="keys desktop-only">
+      <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動（依鏡頭方向）</li>
+      <li><kbd>R</kbd> 切換走路／跑步</li>
+      <li><kbd>Space</kbd> 跳躍</li>
+      <li><kbd>Ctrl</kbd> 趴下休息／起身</li>
+      <li><kbd>Tab</kbd> 第一／第三人稱</li>
+      <li><kbd>C</kbd> 切換貓咪（細臉版／短頸版）</li>
+      <li>滑鼠：轉向與仰角 · 滾輪：鏡頭遠近</li>
+    </ul>
+    <div class="hud-buttons"><button id="reset">回到門前</button><button id="swap-cat">換貓咪</button></div>
+    <p class="house-help">從正門進入，沿中央樓梯上下樓。室內可用 Tab／視角按鈕切換第一人稱。</p>
+    <a class="home-link" href="../">返回版本選擇</a>
+  </div>
 </section>
 
 <div id="stick" class="panel touch-only" aria-label="移動搖桿"><div id="knob"></div></div>

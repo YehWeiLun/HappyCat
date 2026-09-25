@@ -36,6 +36,19 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 
+// ---------- HUD collapse (panel eats too much of a phone screen otherwise) ----------
+const HUD_COLLAPSE_KEY = 'happycat.hud.collapsed.v3';
+function setHudCollapsed(collapsed) {
+  $('#hud').classList.toggle('collapsed', collapsed);
+  $('#hud-toggle').setAttribute('aria-expanded', String(!collapsed));
+  $('#hud-toggle').textContent = collapsed ? '▸' : '▾';
+  try { localStorage.setItem(HUD_COLLAPSE_KEY, collapsed ? '1' : '0'); } catch {}
+}
+let hudStored = null;
+try { hudStored = localStorage.getItem(HUD_COLLAPSE_KEY); } catch {}
+setHudCollapsed(hudStored === null ? isTouch : hudStored === '1');
+$('#hud-toggle').addEventListener('click', () => setHudCollapsed(!$('#hud').classList.contains('collapsed')));
+
 function fail(message) {
   $('#error').hidden = false;
   $('#error').textContent = message;
